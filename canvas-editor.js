@@ -18,6 +18,11 @@ class CanvasEditor {
     // 手書き用オフスクリーンレイヤー
     this.drawLayer = document.createElement('canvas');
     this.drawCtx = this.drawLayer.getContext('2d');
+    // 描画中のストローク専用レイヤー（縁取り・ぷっくりなど多重描画スタイルが
+    // 既存の線の上に重なって「線が欠ける/食い込む」のを防ぐため、
+    // 一度ここに単独で描いてから完成後にまとめて本レイヤーへ合成する）
+    this.strokeLayer = document.createElement('canvas');
+    this.strokeCtx = this.strokeLayer.getContext('2d');
     this.undoStack = [];
     this.redoStack = [];
     this.onUndoStackChange = null; // 戻す/やり直すボタンの有効・無効表示の更新用コールバック
@@ -139,6 +144,8 @@ class CanvasEditor {
     this.drawLayer.width = w;
     this.drawLayer.height = h;
     this.drawCtx.clearRect(0, 0, w, h);
+    this.strokeLayer.width = w;
+    this.strokeLayer.height = h;
     this.undoStack = [];
     this.redoStack = [];
     this._notifyUndoStackChange();
@@ -272,8 +279,11 @@ class CanvasEditor {
       ctx.restore();
     }
 
-    // 手書きレイヤー
+    // 手書きレイヤー（描画中のストロークは専用レイヤーに重ねてプレビュー）
     ctx.drawImage(this.drawLayer, 0, 0);
+    if (this._isDrawing && this.tool !== 'eraser') {
+      ctx.drawImage(this.strokeLayer, 0, 0);
+    }
 
     // テキスト
     for (const t of this.texts) {
@@ -536,7 +546,11 @@ class CanvasEditor {
     if (this.activeTab === 'draw') {
       this._isDrawing = true;
       this._pushUndo();
-      this._strokeSnapshot = this.drawCtx.getImageData(0, 0, this.drawLayer.width, this.drawLayer.height);
+      if (this.tool === 'eraser') {
+        this._strokeSnapshot = this.drawCtx.getImageData(0, 0, this.drawLayer.width, this.drawLayer.height);
+      } else {
+        this.strokeCtx.clearRect(0, 0, this.strokeLayer.width, this.strokeLayer.height);
+      }
       this._strokePoints = [{ x, y }];
       this._redrawStroke();
       return;
@@ -681,6 +695,11 @@ class CanvasEditor {
   }
 
   _onPointerUp(e) {
+    if (this._isDrawing && this.tool !== 'eraser') {
+      // 完成したストロークを一度だけ本レイヤーへ合成し、ストロークレイヤーを空に戻す
+      this.drawCtx.drawImage(this.strokeLayer, 0, 0);
+      this.strokeCtx.clearRect(0, 0, this.strokeLayer.width, this.strokeLayer.height);
+    }
     this._isDrawing = false;
     this._strokeSnapshot = null;
     this._strokePoints = null;
@@ -725,16 +744,18 @@ class CanvasEditor {
   }
 
   // ストローク中のプレビューを描き直す。
-  // ストローク開始時のスナップショットに毎回戻してから全体のパスを描画することで、
-  // 半透明・縁取りなどの「線が重なって濃くなる/欠ける」問題を防ぐ。
+  // 消しゴムは開始時のスナップショットに毎回戻してから消去パスを描き直す。
+  // ペンは専用のストロークレイヤーをクリアしてから全体のパスを描き直すことで、
+  // 自分自身との重なりで色が濃くなったり、既存の線に縁取りが食い込んだりするのを防ぐ
+  // （完成後に一度だけ本レイヤーへ合成するので、前の線と自然につながって見える）。
   _redrawStroke() {
-    if (!this._strokeSnapshot) return;
-    this.drawCtx.putImageData(this._strokeSnapshot, 0, 0);
-
     const points = this._strokePoints;
     if (this.tool === 'eraser') {
+      if (!this._strokeSnapshot) return;
+      this.drawCtx.putImageData(this._strokeSnapshot, 0, 0);
       this._paintEraserPath(points);
     } else {
+      this.strokeCtx.clearRect(0, 0, this.strokeLayer.width, this.strokeLayer.height);
       this._paintPenPath(points);
     }
     this.render();
@@ -854,9 +875,9 @@ class CanvasEditor {
     ctx.restore();
   }
 
-  // ペンの種類ごとの描画処理（手書きレイヤーへの実描画）
+  // ペンの種類ごとの描画処理（ストローク専用レイヤーへの実描画）
   _paintPenPath(points) {
-    CanvasEditor.paintStrokePath(this.drawCtx, points, {
+    CanvasEditor.paintStrokePath(this.strokeCtx, points, {
       width: this.penWidth,
       color: this.penColor,
       style: this.penStyle
