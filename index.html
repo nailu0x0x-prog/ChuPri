@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VTuberプリクラ</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ① フレーム選択画面 -->
+  <section id="screen-frame" class="screen active">
+    <h1 class="logo">📸 VTuberプリクラ</h1>
+    <p class="hint" style="text-align:center; margin-bottom:14px;">まずはフレームを選んでね♪</p>
+    <div id="frame-select-list" class="thumb-list" style="flex-wrap:wrap; justify-content:center; overflow:visible;"></div>
+    <div style="text-align:center; margin-top:24px;">
+      <button id="btn-frame-next" class="btn btn-primary">つぎへ →</button>
+    </div>
+  </section>
+
+  <!-- ② 写真取込画面 -->
+  <section id="screen-import" class="screen">
+    <h1 class="logo">📸 VTuberプリクラ</h1>
+    <div class="import-actions">
+      <button id="btn-camera" class="btn btn-primary">📷 カメラで撮る</button>
+      <label class="btn btn-primary" for="file-input">🖼 画像を選ぶ</label>
+      <input type="file" id="file-input" accept="image/*" hidden>
+    </div>
+    <div id="dropzone" class="dropzone">
+      ここに画像をドラッグ&ドロップ
+    </div>
+
+    <div id="camera-view" class="camera-view hidden">
+      <video id="camera-video" autoplay playsinline></video>
+      <div class="camera-actions">
+        <button id="btn-shoot" class="btn btn-primary">📸 撮影</button>
+        <button id="btn-camera-cancel" class="btn">キャンセル</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 編集画面 -->
+  <section id="screen-edit" class="screen">
+    <div class="edit-layout">
+
+      <!-- キャンバス（メイン） -->
+      <div class="canvas-area">
+        <div class="canvas-toolbar">
+          <button id="btn-back" class="circle-btn">END</button>
+          <button id="btn-frame-adjust" class="btn btn-small hidden">🖼 写真の位置調整</button>
+        </div>
+
+        <div id="frame-adjust-panel" class="frame-adjust-panel hidden">
+          <label class="row" style="margin:0 0 6px">写真の大きさ
+            <input type="range" id="frame-photo-scale" min="0.5" max="2.5" step="0.01" value="1">
+          </label>
+          <p class="hint">キャンバスをドラッグすると写真の位置を調整できます。終わったらもう一度ボタンを押してね。</p>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="main-canvas"></canvas>
+        </div>
+        <button id="btn-goto-save" class="btn-save-badge">ほぞん</button>
+
+        <!-- キャンバス直下のクイック操作（戻す・消しゴムサイズ）-->
+        <div class="quick-controls">
+          <button id="btn-undo" class="tri-btn">1つ戻る</button>
+          <button id="btn-clear-draw" class="tri-btn">全て戻る</button>
+          <div class="eraser-box">
+            <span class="eraser-label">消しゴム</span>
+            <div class="eraser-dots">
+              <button type="button" class="eraser-dot active" data-size="6" style="--dot:9px"></button>
+              <button type="button" class="eraser-dot" data-size="14" style="--dot:15px"></button>
+              <button type="button" class="eraser-dot" data-size="24" style="--dot:22px"></button>
+              <button type="button" class="eraser-dot" data-size="38" style="--dot:30px"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 操作パネル -->
+      <aside class="edit-sidebar">
+        <nav class="tabs">
+          <button class="tab-btn active" data-tab="draw">ペン</button>
+          <button class="tab-btn" data-tab="stamp">スタンプ</button>
+          <button class="tab-btn" data-tab="text">文字</button>
+          <button class="tab-btn" data-tab="filter">フィルター</button>
+        </nav>
+
+        <div class="tool-panels">
+          <div class="tool-panel active" data-panel="draw">
+            <div class="draw-options">
+              <div class="draw-tools">
+                <button id="btn-pen" class="btn tool-toggle active">✏️ ペン</button>
+                <button id="btn-eraser" class="btn tool-toggle">🧹 消しゴム</button>
+                <div class="pen-style-list">
+                  <button class="btn pen-style-btn active" data-style="normal">ノーマル</button>
+                  <button class="btn pen-style-btn" data-style="outline">縁取り</button>
+                  <button class="btn pen-style-btn" data-style="puffy">ぷっくり</button>
+                  <button class="btn pen-style-btn" data-style="translucent">半透明</button>
+                  <button class="btn pen-style-btn" data-style="double">二重</button>
+                </div>
+                <label class="row" style="margin:10px 0 0">色 <input type="color" id="pen-color" value="#ff5fa2"></label>
+                <label class="row" style="margin:0">背景色 <input type="color" id="bg-color" value="#ffffff"></label>
+              </div>
+              <div class="pen-width-slider">
+                <span class="hint">ふとさ</span>
+                <input type="range" id="pen-width" min="1" max="40" value="6" orient="vertical">
+                <span class="hint" id="pen-width-value">6</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="tool-panel" data-panel="stamp">
+            <div id="stamp-list" class="thumb-list"></div>
+            <p class="hint">タップで配置 / ドラッグで移動 / ダブルタップで削除</p>
+          </div>
+
+          <div class="tool-panel" data-panel="text">
+            <div class="row">
+              <input type="text" id="text-input" placeholder="テキストを入力">
+              <button id="btn-add-text" class="btn btn-primary">追加</button>
+            </div>
+            <div class="row">
+              <label>フォント
+                <select id="text-font">
+                  <option value="'Yu Mincho', serif">明朝</option>
+                  <option value="'Yu Gothic', sans-serif" selected>ゴシック</option>
+                  <option value="'Comic Sans MS', 'Rounded Mplus 1c', sans-serif">ポップ</option>
+                </select>
+              </label>
+              <label>サイズ <input type="range" id="text-size" min="14" max="80" value="32"></label>
+            </div>
+            <div class="row">
+              <label>文字色 <input type="color" id="text-color" value="#ffffff"></label>
+              <label>縁取り色 <input type="color" id="text-stroke" value="#ff3399"></label>
+              <label><input type="checkbox" id="text-shadow" checked> 影をつける</label>
+            </div>
+            <p class="hint">追加後はドラッグで移動 / ダブルタップで削除</p>
+          </div>
+
+          <div class="tool-panel" data-panel="filter">
+            <div id="filter-list" class="filter-list"></div>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- ③ 保存・シェア画面 -->
+  <section id="screen-save" class="screen">
+    <header class="edit-header">
+      <button id="btn-back-edit" class="btn btn-small">← 編集に戻る</button>
+      <h2>完成！</h2>
+      <span></span>
+    </header>
+    <div class="result-wrap">
+      <img id="result-image" alt="完成画像">
+    </div>
+    <div class="save-actions">
+      <a id="btn-download" class="btn btn-primary" download="vtuber-purikura.png">⬇️ PNG保存</a>
+      <button id="btn-copy" class="btn">📋 コピー</button>
+      <button id="btn-restart" class="btn">🔄 最初から</button>
+    </div>
+    <p id="copy-msg" class="hint"></p>
+  </section>
+
+</div>
+
+<script src="filters.js"></script>
+<script src="canvas-editor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
