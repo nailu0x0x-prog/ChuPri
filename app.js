@@ -18,7 +18,13 @@ const STAMP_ASSETS = [
   { file: 'headset.png',   name: '配信アイコン' },
   { file: 'controller.png',name: 'コントローラー' },
   { file: 'emote-smile.png', name: 'にこにこ' },
-  { file: 'emote-cry.png',   name: 'えーん' }
+  { file: 'emote-cry.png',   name: 'えーん' },
+  { file: 'chupri-blob-star.png',  name: 'ぷにぷにスター' },
+  { file: 'chupri-feather.png',    name: 'はね' },
+  { file: 'chupri-sparkle.png',    name: 'キラキラ' },
+  { file: 'chupri-dot-heart.png',  name: 'ドットハート' },
+  { file: 'chupri-ribbon.png',     name: 'リボン' },
+  { file: 'chupri-bubble-excl.png',name: '吹き出し！！' }
 ];
 
 const $ = (sel) => document.querySelector(sel);
