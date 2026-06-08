@@ -340,12 +340,65 @@ btnEraser.addEventListener('click', () => {
   btnEraser.classList.add('active');
   btnPen.classList.remove('active');
 });
-const penStyleButtons = document.querySelectorAll('.pen-style-btn');
-penStyleButtons.forEach(btn => {
+// ペンの種類：文字だけだと見た目が分からないので「〜」のプレビューをアイコンとして並べる（3列×3行）
+const PEN_STYLES = [
+  { key: 'normal',           label: 'ノーマル' },
+  { key: 'outline',          label: '縁取り' },
+  { key: 'puffy',            label: 'ぷっくり' },
+  { key: 'translucent',      label: '半透明' },
+  { key: 'double',           label: '二重' },
+  { key: 'marker',           label: 'マーカー' },
+  { key: 'neon',             label: 'ネオンペン' },
+  { key: 'fluffy',           label: 'ふわふわ' },
+  { key: 'blackOutlineShift',label: '黒縁ずれ' }
+];
+
+function drawPenStyleIcon(canvas, styleKey) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const points = [];
+  const segments = 24;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    points.push({
+      x: 6 + t * (w - 12),
+      y: h / 2 + Math.sin(t * Math.PI * 2.4) * (h * 0.22)
+    });
+  }
+  CanvasEditor.paintStrokePath(ctx, points, { width: 4, color: '#ff5fa2', style: styleKey });
+}
+
+const penStyleGrid = $('#pen-style-grid');
+const penStyleButtons = [];
+PEN_STYLES.forEach(({ key, label }) => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn pen-style-btn';
+  btn.dataset.style = key;
+  if (key === 'normal') btn.classList.add('active');
+
+  const icon = document.createElement('canvas');
+  icon.className = 'pen-style-icon';
+  icon.width = 64;
+  icon.height = 32;
+  btn.appendChild(icon);
+
+  const text = document.createElement('span');
+  text.className = 'pen-style-label';
+  text.textContent = label;
+  btn.appendChild(text);
+
+  drawPenStyleIcon(icon, key);
+
   btn.addEventListener('click', () => {
     penStyleButtons.forEach(b => b.classList.toggle('active', b === btn));
-    editor.setPenStyle(btn.dataset.style);
+    editor.setPenStyle(key);
   });
+
+  penStyleGrid.appendChild(btn);
+  penStyleButtons.push(btn);
 });
 
 const btnUndo = $('#btn-undo');

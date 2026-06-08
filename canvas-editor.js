@@ -766,25 +766,34 @@ class CanvasEditor {
     ctx.restore();
   }
 
-  // ペンの種類ごとの描画処理（ノーマル/縁取り/ぷっくり/半透明/二重）
-  _paintPenPath(points) {
-    const ctx = this.drawCtx;
-    const w = this.penWidth;
-    const color = this.penColor;
+  // ペンの種類ごとの描画処理（実際の描画とパネルのアイコンプレビューの両方から呼ばれる）
+  static paintStrokePath(ctx, points, { width, color, style }) {
+    const w = width;
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
+    const tracePath = (dx = 0, dy = 0) => {
+      ctx.beginPath();
+      if (points.length === 1) {
+        ctx.moveTo(points[0].x + dx, points[0].y + dy);
+        ctx.lineTo(points[0].x + dx, points[0].y + dy);
+      } else {
+        ctx.moveTo(points[0].x + dx, points[0].y + dy);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x + dx, points[i].y + dy);
+      }
+    };
+
     const strokePath = (lineWidth, strokeStyle, alpha = 1, dx = 0, dy = 0) => {
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = strokeStyle;
       ctx.lineWidth = lineWidth;
-      this._tracePath(ctx, points, dx, dy);
+      tracePath(dx, dy);
       ctx.stroke();
     };
 
-    switch (this.penStyle) {
+    switch (style) {
       case 'outline':
         strokePath(w + Math.max(2, w * 0.5), '#ffffff', 1);
         strokePath(w, color, 1);
@@ -808,6 +817,34 @@ class CanvasEditor {
         break;
       }
 
+      case 'marker':
+        ctx.globalCompositeOperation = 'multiply';
+        strokePath(w * 1.7, color, 0.5);
+        ctx.globalCompositeOperation = 'source-over';
+        break;
+
+      case 'neon':
+        ctx.shadowColor = color;
+        ctx.shadowBlur = w * 1.6;
+        strokePath(w, color, 1);
+        ctx.shadowBlur = w * 0.8;
+        strokePath(Math.max(1, w * 0.4), '#ffffff', 0.95);
+        ctx.shadowBlur = 0;
+        break;
+
+      case 'fluffy':
+        strokePath(w * 1.9, color, 0.16);
+        strokePath(w * 1.4, color, 0.22);
+        strokePath(w, color, 0.5);
+        break;
+
+      case 'blackOutlineShift': {
+        const offset = w * 0.4;
+        strokePath(w, '#000000', 1, offset, offset);
+        strokePath(w, color, 1);
+        break;
+      }
+
       case 'normal':
       default:
         strokePath(w, color, 1);
@@ -815,6 +852,15 @@ class CanvasEditor {
     }
 
     ctx.restore();
+  }
+
+  // ペンの種類ごとの描画処理（手書きレイヤーへの実描画）
+  _paintPenPath(points) {
+    CanvasEditor.paintStrokePath(this.drawCtx, points, {
+      width: this.penWidth,
+      color: this.penColor,
+      style: this.penStyle
+    });
   }
 
   // ---- 出力 ----

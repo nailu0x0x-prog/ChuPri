@@ -427,15 +427,30 @@ body {
   gap: 8px;
 }
 .draw-tools .row { margin: 0; }
-.pen-style-list {
-  display: flex;
-  flex-wrap: wrap;
+.pen-style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 .pen-style-btn {
-  padding: 8px 12px;
-  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px;
+  font-size: 11px;
   box-shadow: none;
+  background: var(--white);
+}
+.pen-style-icon {
+  width: 100%;
+  max-width: 64px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bg-canvas);
+}
+.pen-style-label {
+  white-space: nowrap;
 }
 .pen-style-btn.active {
   background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
