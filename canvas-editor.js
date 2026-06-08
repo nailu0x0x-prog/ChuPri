@@ -392,8 +392,9 @@ class CanvasEditor {
     ctx.lineTo(handles.rotate.x, handles.rotate.y);
     ctx.stroke();
 
+    // 絵文字はOS・ブラウザでグリフの中心位置がずれるため、円の中に直接アイコンを描画する
     const HANDLE_R = 24;
-    const drawHandle = (pos, emoji, bg) => {
+    const drawHandle = (pos, drawIcon, bg, fg) => {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, HANDLE_R, 0, Math.PI * 2);
       ctx.fillStyle = bg || '#ffffff';
@@ -401,16 +402,69 @@ class CanvasEditor {
       ctx.lineWidth = 2.5;
       ctx.strokeStyle = 'rgba(255, 95, 162, 0.9)';
       ctx.stroke();
-      ctx.font = `${Math.round(HANDLE_R * 1.15)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const m = ctx.measureText(emoji);
-      const vOffset = ((m.actualBoundingBoxAscent || 0) - (m.actualBoundingBoxDescent || 0)) / 2;
-      ctx.fillText(emoji, pos.x, pos.y + vOffset);
+      ctx.save();
+      ctx.translate(pos.x, pos.y);
+      ctx.strokeStyle = fg || '#ff5fa2';
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      drawIcon(ctx);
+      ctx.restore();
     };
-    drawHandle(handles.resize, '↔️');
-    drawHandle(handles.rotate, '🔄');
-    drawHandle(handles.delete, '🗑️', 'rgba(255,255,255,0.95)');
+
+    // ↔️ 拡大縮小：両端に矢じりのある横線
+    const drawResizeIcon = (c) => {
+      const L = 11;
+      c.beginPath();
+      c.moveTo(-L, 0);
+      c.lineTo(L, 0);
+      c.stroke();
+      const head = (x, dir) => {
+        c.beginPath();
+        c.moveTo(x, 0);
+        c.lineTo(x - dir * 6, -5);
+        c.lineTo(x - dir * 6, 5);
+        c.closePath();
+        c.fill();
+      };
+      head(-L, -1);
+      head(L, 1);
+    };
+
+    // 🔄 回転：弧と矢じり
+    const drawRotateIcon = (c) => {
+      const R = 9;
+      const start = -Math.PI * 0.75;
+      const end = Math.PI * 0.55;
+      c.beginPath();
+      c.arc(0, 0, R, start, end);
+      c.stroke();
+      const ex = R * Math.cos(end);
+      const ey = R * Math.sin(end);
+      const tangent = end + Math.PI / 2;
+      c.beginPath();
+      c.moveTo(ex + 6 * Math.cos(tangent), ey + 6 * Math.sin(tangent));
+      c.lineTo(ex - 6 * Math.cos(tangent - 0.6), ey - 6 * Math.sin(tangent - 0.6));
+      c.lineTo(ex - 6 * Math.cos(tangent + 0.6), ey - 6 * Math.sin(tangent + 0.6));
+      c.closePath();
+      c.fill();
+    };
+
+    // 🗑️ 削除：×印
+    const drawDeleteIcon = (c) => {
+      const L = 7;
+      c.beginPath();
+      c.moveTo(-L, -L);
+      c.lineTo(L, L);
+      c.moveTo(L, -L);
+      c.lineTo(-L, L);
+      c.stroke();
+    };
+
+    drawHandle(handles.resize, drawResizeIcon, '#ffffff', '#ff5fa2');
+    drawHandle(handles.rotate, drawRotateIcon, '#ffffff', '#ff5fa2');
+    drawHandle(handles.delete, drawDeleteIcon, '#ff5f7a', '#ffffff');
     ctx.restore();
   }
 
