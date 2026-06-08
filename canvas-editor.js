@@ -696,9 +696,25 @@ class CanvasEditor {
 
   _onPointerUp(e) {
     if (this._isDrawing && this.tool !== 'eraser') {
-      // 完成したストロークを一度だけ本レイヤーへ合成し、ストロークレイヤーを空に戻す
+      const w = this.strokeLayer.width, h = this.strokeLayer.height;
+      const opts = { width: this.penWidth, color: this.penColor, style: this.penStyle };
+
+      // 縁取りなどの「ハロー」部分は、既存の線を覆い隠さないよう一番下に重ねる
+      // （destination-over で合成すれば、すでに描かれた線の上には乗らず隙間だけを埋める）
+      const haloCanvas = document.createElement('canvas');
+      haloCanvas.width = w;
+      haloCanvas.height = h;
+      CanvasEditor.paintStrokePath(haloCanvas.getContext('2d'), this._strokePoints, { ...opts, part: 'halo' });
+      this.drawCtx.save();
+      this.drawCtx.globalCompositeOperation = 'destination-over';
+      this.drawCtx.drawImage(haloCanvas, 0, 0);
+      this.drawCtx.restore();
+
+      // 線の本体（コア）は常に最前面に重ねるので、他の線と交差しても途切れず繋がって見える
+      this.strokeCtx.clearRect(0, 0, w, h);
+      CanvasEditor.paintStrokePath(this.strokeCtx, this._strokePoints, { ...opts, part: 'core' });
       this.drawCtx.drawImage(this.strokeLayer, 0, 0);
-      this.strokeCtx.clearRect(0, 0, this.strokeLayer.width, this.strokeLayer.height);
+      this.strokeCtx.clearRect(0, 0, w, h);
     }
     this._isDrawing = false;
     this._strokeSnapshot = null;
@@ -788,8 +804,10 @@ class CanvasEditor {
   }
 
   // ペンの種類ごとの描画処理（実際の描画とパネルのアイコンプレビューの両方から呼ばれる）
-  static paintStrokePath(ctx, points, { width, color, style }) {
+  static paintStrokePath(ctx, points, { width, color, style, part = 'all' }) {
     const w = width;
+    const wantsHalo = part === 'all' || part === 'halo';
+    const wantsCore = part === 'all' || part === 'core';
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
     ctx.lineCap = 'round';
@@ -816,11 +834,22 @@ class CanvasEditor {
 
     switch (style) {
       case 'outline':
-        strokePath(w + Math.max(2, w * 0.5), '#ffffff', 1);
-        strokePath(w, color, 1);
+        // ハロー（白縁）は背景、コア（色線）は前景として分離し、
+        // 別ストロークと交差しても白縁が相手の線を覆わないようにする
+        if (wantsHalo) strokePath(w + Math.max(2, w * 0.5), '#ffffff', 1);
+        if (wantsCore) strokePath(w, color, 1);
         break;
 
+      case 'blackOutlineShift': {
+        const offset = w * 0.4;
+        if (wantsHalo) strokePath(w, '#000000', 1, offset, offset);
+        if (wantsCore) strokePath(w, color, 1);
+        break;
+      }
+
+      // ハロー（背景）を持たないスタイルは、コア要求時にまとめて描画する
       case 'puffy': {
+        if (!wantsCore) break;
         const offset = w * 0.18;
         strokePath(w, color, 1);
         strokePath(Math.max(1, w * 0.4), 'rgba(255,255,255,0.65)', 1, -offset, -offset);
@@ -828,10 +857,12 @@ class CanvasEditor {
       }
 
       case 'translucent':
+        if (!wantsCore) break;
         strokePath(w, color, 0.4);
         break;
 
       case 'double': {
+        if (!wantsCore) break;
         const offset = w * 0.45;
         strokePath(Math.max(1, w * 0.45), color, 1, -offset, -offset);
         strokePath(Math.max(1, w * 0.45), color, 1, offset, offset);
@@ -839,12 +870,14 @@ class CanvasEditor {
       }
 
       case 'marker':
+        if (!wantsCore) break;
         ctx.globalCompositeOperation = 'multiply';
         strokePath(w * 1.7, color, 0.5);
         ctx.globalCompositeOperation = 'source-over';
         break;
 
       case 'neon':
+        if (!wantsCore) break;
         ctx.shadowColor = color;
         ctx.shadowBlur = w * 1.6;
         strokePath(w, color, 1);
@@ -854,20 +887,15 @@ class CanvasEditor {
         break;
 
       case 'fluffy':
+        if (!wantsCore) break;
         strokePath(w * 1.9, color, 0.16);
         strokePath(w * 1.4, color, 0.22);
         strokePath(w, color, 0.5);
         break;
 
-      case 'blackOutlineShift': {
-        const offset = w * 0.4;
-        strokePath(w, '#000000', 1, offset, offset);
-        strokePath(w, color, 1);
-        break;
-      }
-
       case 'normal':
       default:
+        if (!wantsCore) break;
         strokePath(w, color, 1);
         break;
     }
