@@ -346,11 +346,21 @@ class CanvasEditor {
   }
 
   _handlePositions(bounds) {
-    const ROTATE_OFFSET = 32;
+    const ROTATE_OFFSET = 40;
     return {
       resize: this._localToWorld(bounds, bounds.halfW, bounds.halfH),
-      rotate: this._localToWorld(bounds, 0, -bounds.halfH - ROTATE_OFFSET)
+      rotate: this._localToWorld(bounds, 0, -bounds.halfH - ROTATE_OFFSET),
+      delete: this._localToWorld(bounds, -bounds.halfW, -bounds.halfH)
     };
+  }
+
+  _deleteSelected() {
+    if (!this.selectedObject) return;
+    const { kind, obj } = this.selectedObject;
+    if (kind === 'stamp') this.stamps = this.stamps.filter(s => s !== obj);
+    else this.texts = this.texts.filter(t => t !== obj);
+    this.selectedObject = null;
+    this.render();
   }
 
   _drawSelectionHandles(selection) {
@@ -382,28 +392,35 @@ class CanvasEditor {
     ctx.lineTo(handles.rotate.x, handles.rotate.y);
     ctx.stroke();
 
-    const drawHandle = (pos, emoji) => {
+    const HANDLE_R = 24;
+    const drawHandle = (pos, emoji, bg) => {
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 16, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
+      ctx.arc(pos.x, pos.y, HANDLE_R, 0, Math.PI * 2);
+      ctx.fillStyle = bg || '#ffffff';
       ctx.fill();
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.strokeStyle = 'rgba(255, 95, 162, 0.9)';
       ctx.stroke();
-      ctx.font = '16px sans-serif';
+      ctx.font = `${Math.round(HANDLE_R * 1.15)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(emoji, pos.x, pos.y + 1);
+      const m = ctx.measureText(emoji);
+      const vOffset = ((m.actualBoundingBoxAscent || 0) - (m.actualBoundingBoxDescent || 0)) / 2;
+      ctx.fillText(emoji, pos.x, pos.y + vOffset);
     };
     drawHandle(handles.resize, '↔️');
     drawHandle(handles.rotate, '🔄');
+    drawHandle(handles.delete, '🗑️', 'rgba(255,255,255,0.95)');
     ctx.restore();
   }
 
   _hitTestHandle(selection, x, y) {
     const bounds = this._getObjBounds(selection);
     const handles = this._handlePositions(bounds);
-    const RADIUS = 20;
+    const RADIUS = 28;
+    if (Math.hypot(x - handles.delete.x, y - handles.delete.y) <= RADIUS) {
+      return { mode: 'delete', bounds };
+    }
     if (Math.hypot(x - handles.resize.x, y - handles.resize.y) <= RADIUS) {
       return { mode: 'resize', bounds };
     }
@@ -456,6 +473,12 @@ class CanvasEditor {
     if (!this.baseImage) return;
     const { x, y } = this._toCanvasCoords(e);
 
+    // 描画中・ドラッグ中・拡大縮小/回転中は、別の指の操作を無視する
+    // （フレーム位置調整のピンチズームだけは2本指の操作を前提とするため例外）
+    if (!this.frameAdjustMode && (this._isDrawing || this._dragTarget || this._handleMode)) {
+      return;
+    }
+
     if (this.activeTab === 'draw') {
       this._isDrawing = true;
       this._pushUndo();
@@ -489,6 +512,10 @@ class CanvasEditor {
     if (this.selectedObject) {
       const handleHit = this._hitTestHandle(this.selectedObject, x, y);
       if (handleHit) {
+        if (handleHit.mode === 'delete') {
+          this._deleteSelected();
+          return;
+        }
         const { kind, obj } = this.selectedObject;
         this._handleMode = handleHit.mode;
         if (handleHit.mode === 'resize') {
