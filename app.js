@@ -52,42 +52,97 @@ const editor = new CanvasEditor(canvas);
 let cameraStream = null;
 let selectedFrame = null; // { image, rect } | null（フレーム選択画面で選んだもの）
 
-// ---- ① フレーム選択 ----
-const frameSelectList = $('#frame-select-list');
+// ---- ① フレーム選択（スワイプで切り替えるカルーセル）----
+const frameCarousel = $('#frame-carousel');
+const frameDots = $('#frame-dots');
 let frameSelectBuilt = false;
+let frameCards = []; // { el, dot, value: { image, rect } | null }
+
+function selectFrameCardByIndex(index) {
+  frameCards.forEach((card, i) => {
+    card.el.classList.toggle('selected', i === index);
+    card.dot.classList.toggle('active', i === index);
+  });
+  selectedFrame = frameCards[index] ? frameCards[index].value : null;
+}
+
 function setupFrameSelectScreen() {
   if (frameSelectBuilt) return;
   frameSelectBuilt = true;
 
-  const noneItem = document.createElement('div');
-  noneItem.className = 'thumb-item selected';
-  noneItem.textContent = 'なし';
-  noneItem.style.fontSize = '13px';
-  noneItem.addEventListener('click', () => {
-    frameSelectList.querySelectorAll('.thumb-item').forEach(el => el.classList.remove('selected'));
-    noneItem.classList.add('selected');
-    selectedFrame = null;
-  });
-  frameSelectList.appendChild(noneItem);
+  const addCard = (value, { name, previewEl }) => {
+    const index = frameCards.length;
+    const card = document.createElement('div');
+    card.className = 'frame-card';
 
-  FRAME_ASSETS.forEach(({ file, name, rect }) => {
-    loadImage(`assets/frames/${file}`).then((img) => {
-      const item = document.createElement('div');
-      item.className = 'thumb-item';
-      item.title = name;
+    const preview = document.createElement('div');
+    preview.className = 'frame-card-preview';
+    if (previewEl) {
+      preview.appendChild(previewEl);
+    } else {
+      preview.classList.add('is-none');
+      preview.textContent = 'フレームなし';
+    }
+    card.appendChild(preview);
+
+    const label = document.createElement('div');
+    label.className = 'frame-card-name';
+    label.textContent = name;
+    card.appendChild(label);
+
+    const dot = document.createElement('span');
+    dot.className = 'frame-dot';
+    dot.addEventListener('click', () => {
+      frameCarousel.scrollTo({ left: card.offsetLeft, behavior: 'smooth' });
+    });
+    frameDots.appendChild(dot);
+
+    frameCarousel.appendChild(card);
+    frameCards.push({ el: card, dot, value });
+    return index;
+  };
+
+  // 「フレームなし」
+  addCard(null, { name: 'フレームなし', previewEl: null });
+
+  // フレーム画像は順序を保つため、すべて読み込んでからカードを追加する
+  Promise.all(FRAME_ASSETS.map(({ file, name, rect }) =>
+    loadImage(`assets/frames/${file}`)
+      .then((img) => ({ img, name, rect }))
+      .catch(() => {
+        console.warn(`フレーム画像が見つかりません: assets/frames/${file}`);
+        return null;
+      })
+  )).then((results) => {
+    results.filter(Boolean).forEach(({ img, name, rect }) => {
       const thumb = document.createElement('img');
       thumb.src = img.src;
       thumb.alt = name;
-      item.appendChild(thumb);
-      item.addEventListener('click', () => {
-        frameSelectList.querySelectorAll('.thumb-item').forEach(el => el.classList.remove('selected'));
-        item.classList.add('selected');
-        selectedFrame = { image: img, rect };
-      });
-      frameSelectList.appendChild(item);
-    }).catch(() => {
-      console.warn(`フレーム画像が見つかりません: assets/frames/${file}`);
+      addCard({ image: img, rect }, { name, previewEl: thumb });
     });
+    selectFrameCardByIndex(0);
+  });
+
+  selectFrameCardByIndex(0);
+
+  // スワイプ位置から選択中のカードを判定
+  let scrollTimer = null;
+  frameCarousel.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const center = frameCarousel.scrollLeft + frameCarousel.clientWidth / 2;
+      let closestIndex = 0;
+      let closestDist = Infinity;
+      frameCards.forEach((card, i) => {
+        const cardCenter = card.el.offsetLeft + card.el.offsetWidth / 2;
+        const dist = Math.abs(cardCenter - center);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestIndex = i;
+        }
+      });
+      selectFrameCardByIndex(closestIndex);
+    }, 80);
   });
 }
 setupFrameSelectScreen();

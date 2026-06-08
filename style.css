@@ -100,6 +100,79 @@ body {
   content: ' ♡';
   -webkit-text-fill-color: var(--accent-pink);
 }
+/* フレーム選択カルーセル */
+.frame-carousel {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  gap: 0;
+  scrollbar-width: none;
+  flex: 1;
+  min-height: 0;
+}
+.frame-carousel::-webkit-scrollbar { display: none; }
+.frame-card {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 6px 18px;
+}
+.frame-card-preview {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1000 / 1539;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(255, 120, 180, 0.3);
+  border: 3px solid var(--white);
+  background: var(--bg-canvas);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.frame-card-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.frame-card-preview.is-none {
+  font-size: 17px;
+  font-weight: bold;
+  color: var(--text-soft);
+}
+.frame-card-name {
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--text);
+}
+.frame-card.selected .frame-card-preview {
+  border-color: var(--accent-pink);
+}
+
+.frame-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.frame-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(122, 74, 99, 0.25);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.frame-dot.active {
+  background: var(--accent-pink);
+  transform: scale(1.25);
+}
+
 .import-actions {
   display: flex;
   gap: 12px;
