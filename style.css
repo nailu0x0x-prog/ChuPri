@@ -21,6 +21,7 @@ body {
   background: linear-gradient(160deg, #ffd9ea 0%, #ffeef6 45%, #fff8fb 100%);
   color: var(--text);
   min-height: 100vh;
+  touch-action: manipulation; /* ダブルタップでのページ拡大を防止 */
 }
 
 #app {
