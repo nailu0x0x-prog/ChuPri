@@ -19,6 +19,8 @@ class CanvasEditor {
     this.drawLayer = document.createElement('canvas');
     this.drawCtx = this.drawLayer.getContext('2d');
     this.undoStack = [];
+    this.redoStack = [];
+    this.onUndoStackChange = null; // 戻す/やり直すボタンの有効・無効表示の更新用コールバック
 
     this.tool = 'pen';         // 'pen' | 'eraser'
     this.penColor = '#ff5fa2';
@@ -27,11 +29,22 @@ class CanvasEditor {
 
     this.activeTab = 'draw';
     this.frameAdjustMode = false; // true の間はキャンバスのドラッグで写真の位置を調整できる
+    this.onFrameScaleChange = null; // ピンチ操作でスケールが変わった時にスライダー側へ通知するコールバック
+
+    this.selectedObject = null; // { kind: 'stamp'|'text', obj } 選択中の配置物（リサイズ・回転ハンドル表示用）
     this._dragTarget = null;
     this._dragOffset = { x: 0, y: 0 };
+    this._handleMode = null; // 'resize' | 'rotate'
+    this._handleStart = null;
     this._isDrawing = false;
     this._strokeSnapshot = null;
     this._strokePoints = null;
+
+    // 写真位置調整中のピンチ操作（マルチタッチ）用
+    this._activePointers = new Map(); // pointerId -> {x, y}
+    this._pinchStart = null; // { dist, scale }
+    this._isPanningPhoto = false;
+    this._panStart = null;
 
     this._bindPointerEvents();
   }
@@ -61,8 +74,9 @@ class CanvasEditor {
     this.frameAdjustMode = on;
   }
 
-  setFramePhotoScale(scale) {
+  setFramePhotoScale(scale, opts = {}) {
     this.framePhotoTransform.scale = scale;
+    if (!opts.silent && this.onFrameScaleChange) this.onFrameScaleChange(scale);
     this.render();
   }
 
@@ -126,8 +140,11 @@ class CanvasEditor {
     this.drawLayer.height = h;
     this.drawCtx.clearRect(0, 0, w, h);
     this.undoStack = [];
+    this.redoStack = [];
+    this._notifyUndoStackChange();
     this.stamps = [];
     this.texts = [];
+    this.selectedObject = null;
   }
 
   setBgColor(color) {
@@ -137,18 +154,21 @@ class CanvasEditor {
 
   addStamp(image) {
     const size = Math.round(Math.min(this.canvas.width, this.canvas.height) * 0.22);
-    this.stamps.push({
+    const stamp = {
       img: image,
       x: this.canvas.width / 2 - size / 2,
       y: this.canvas.height / 2 - size / 2,
       size,
+      rotation: 0,
       id: this._nextId++
-    });
+    };
+    this.stamps.push(stamp);
+    this.selectedObject = { kind: 'stamp', obj: stamp };
     this.render();
   }
 
   addText(opts) {
-    this.texts.push({
+    const text = {
       text: opts.text,
       x: this.canvas.width / 2,
       y: this.canvas.height / 2,
@@ -157,8 +177,11 @@ class CanvasEditor {
       color: opts.color,
       stroke: opts.stroke,
       shadow: opts.shadow,
+      rotation: 0,
       id: this._nextId++
-    });
+    };
+    this.texts.push(text);
+    this.selectedObject = { kind: 'text', obj: text };
     this.render();
   }
 
@@ -167,7 +190,17 @@ class CanvasEditor {
   setPenWidth(w) { this.penWidth = w; }
   setPenStyle(style) { this.penStyle = style; }
 
-  setActiveTab(tab) { this.activeTab = tab; }
+  setActiveTab(tab) {
+    this.activeTab = tab;
+    this.selectedObject = null;
+    this.render();
+  }
+
+  _notifyUndoStackChange() {
+    if (this.onUndoStackChange) {
+      this.onUndoStackChange(this.undoStack.length, this.redoStack.length);
+    }
+  }
 
   clearDrawing() {
     this._pushUndo();
@@ -177,8 +210,23 @@ class CanvasEditor {
 
   undo() {
     if (this.undoStack.length === 0) return;
+    const { width, height } = this.drawLayer;
+    this.redoStack.push(this.drawCtx.getImageData(0, 0, width, height));
+    if (this.redoStack.length > 20) this.redoStack.shift();
     const snapshot = this.undoStack.pop();
     this.drawCtx.putImageData(snapshot, 0, 0);
+    this._notifyUndoStackChange();
+    this.render();
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return;
+    const { width, height } = this.drawLayer;
+    this.undoStack.push(this.drawCtx.getImageData(0, 0, width, height));
+    if (this.undoStack.length > 20) this.undoStack.shift();
+    const snapshot = this.redoStack.pop();
+    this.drawCtx.putImageData(snapshot, 0, 0);
+    this._notifyUndoStackChange();
     this.render();
   }
 
@@ -217,7 +265,11 @@ class CanvasEditor {
 
     // スタンプ
     for (const s of this.stamps) {
-      ctx.drawImage(s.img, s.x, s.y, s.size, s.size);
+      ctx.save();
+      ctx.translate(s.x + s.size / 2, s.y + s.size / 2);
+      ctx.rotate(s.rotation || 0);
+      ctx.drawImage(s.img, -s.size / 2, -s.size / 2, s.size, s.size);
+      ctx.restore();
     }
 
     // 手書きレイヤー
@@ -226,6 +278,8 @@ class CanvasEditor {
     // テキスト
     for (const t of this.texts) {
       ctx.save();
+      ctx.translate(t.x, t.y);
+      ctx.rotate(t.rotation || 0);
       ctx.font = `bold ${t.size}px ${t.font}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -237,12 +291,126 @@ class CanvasEditor {
       if (t.stroke) {
         ctx.lineWidth = Math.max(2, t.size * 0.12);
         ctx.strokeStyle = t.stroke;
-        ctx.strokeText(t.text, t.x, t.y);
+        ctx.strokeText(t.text, 0, 0);
       }
       ctx.fillStyle = t.color;
-      ctx.fillText(t.text, t.x, t.y);
+      ctx.fillText(t.text, 0, 0);
       ctx.restore();
     }
+
+    // 選択中の配置物：枠とリサイズ・回転ハンドルを表示
+    if (this.selectedObject && this.activeTab !== 'draw') {
+      this._drawSelectionHandles(this.selectedObject);
+    }
+  }
+
+  // ---- 配置物の選択・変形（バウンディングボックス計算・ハンドル）----
+  _getObjBounds({ kind, obj }) {
+    if (kind === 'stamp') {
+      return {
+        cx: obj.x + obj.size / 2,
+        cy: obj.y + obj.size / 2,
+        halfW: obj.size / 2,
+        halfH: obj.size / 2,
+        rotation: obj.rotation || 0
+      };
+    }
+    this.ctx.font = `bold ${obj.size}px ${obj.font}`;
+    const halfW = Math.max(this.ctx.measureText(obj.text).width / 2, obj.size / 2);
+    return {
+      cx: obj.x,
+      cy: obj.y,
+      halfW,
+      halfH: obj.size / 2,
+      rotation: obj.rotation || 0
+    };
+  }
+
+  // ローカル座標（オブジェクト中心からのオフセット）をワールド座標に変換
+  _localToWorld(bounds, lx, ly) {
+    const cos = Math.cos(bounds.rotation);
+    const sin = Math.sin(bounds.rotation);
+    return {
+      x: bounds.cx + lx * cos - ly * sin,
+      y: bounds.cy + lx * sin + ly * cos
+    };
+  }
+
+  // ワールド座標をオブジェクトのローカル座標（回転を打ち消した座標系）に変換
+  _worldToLocal(bounds, wx, wy) {
+    const dx = wx - bounds.cx;
+    const dy = wy - bounds.cy;
+    const cos = Math.cos(-bounds.rotation);
+    const sin = Math.sin(-bounds.rotation);
+    return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+  }
+
+  _handlePositions(bounds) {
+    const ROTATE_OFFSET = 32;
+    return {
+      resize: this._localToWorld(bounds, bounds.halfW, bounds.halfH),
+      rotate: this._localToWorld(bounds, 0, -bounds.halfH - ROTATE_OFFSET)
+    };
+  }
+
+  _drawSelectionHandles(selection) {
+    const { ctx } = this;
+    const bounds = this._getObjBounds(selection);
+    const corners = [
+      this._localToWorld(bounds, -bounds.halfW, -bounds.halfH),
+      this._localToWorld(bounds, bounds.halfW, -bounds.halfH),
+      this._localToWorld(bounds, bounds.halfW, bounds.halfH),
+      this._localToWorld(bounds, -bounds.halfW, bounds.halfH)
+    ];
+    const handles = this._handlePositions(bounds);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 95, 162, 0.9)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 回転ハンドルへのガイド線
+    const topMid = this._localToWorld(bounds, 0, -bounds.halfH);
+    ctx.beginPath();
+    ctx.moveTo(topMid.x, topMid.y);
+    ctx.lineTo(handles.rotate.x, handles.rotate.y);
+    ctx.stroke();
+
+    const drawHandle = (pos, emoji) => {
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 16, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 95, 162, 0.9)';
+      ctx.stroke();
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, pos.x, pos.y + 1);
+    };
+    drawHandle(handles.resize, '↔️');
+    drawHandle(handles.rotate, '🔄');
+    ctx.restore();
+  }
+
+  _hitTestHandle(selection, x, y) {
+    const bounds = this._getObjBounds(selection);
+    const handles = this._handlePositions(bounds);
+    const RADIUS = 20;
+    if (Math.hypot(x - handles.resize.x, y - handles.resize.y) <= RADIUS) {
+      return { mode: 'resize', bounds };
+    }
+    if (Math.hypot(x - handles.rotate.x, y - handles.rotate.y) <= RADIUS) {
+      return { mode: 'rotate', bounds };
+    }
+    return null;
   }
 
   // ---- ポインター操作（ドラッグ配置・削除・手書き）----
@@ -267,20 +435,19 @@ class CanvasEditor {
   _hitTestStamp(x, y) {
     for (let i = this.stamps.length - 1; i >= 0; i--) {
       const s = this.stamps[i];
-      if (x >= s.x && x <= s.x + s.size && y >= s.y && y <= s.y + s.size) return s;
+      const bounds = this._getObjBounds({ kind: 'stamp', obj: s });
+      const local = this._worldToLocal(bounds, x, y);
+      if (Math.abs(local.x) <= bounds.halfW && Math.abs(local.y) <= bounds.halfH) return s;
     }
     return null;
   }
 
   _hitTestText(x, y) {
-    const ctx = this.ctx;
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i];
-      ctx.font = `bold ${t.size}px ${t.font}`;
-      const metrics = ctx.measureText(t.text);
-      const halfW = metrics.width / 2;
-      const halfH = t.size / 2;
-      if (x >= t.x - halfW && x <= t.x + halfW && y >= t.y - halfH && y <= t.y + halfH) return t;
+      const bounds = this._getObjBounds({ kind: 'text', obj: t });
+      const local = this._worldToLocal(bounds, x, y);
+      if (Math.abs(local.x) <= bounds.halfW && Math.abs(local.y) <= bounds.halfH) return t;
     }
     return null;
   }
@@ -298,31 +465,78 @@ class CanvasEditor {
       return;
     }
 
-    // 位置調整モード：ドラッグで窓枠内の写真位置を調整
+    // 位置調整モード：ドラッグで窓枠内の写真位置を調整（2本指でピンチするとズーム）
     if (this.frameAdjustMode && this.frame) {
-      this._isPanningPhoto = true;
-      this._panStart = {
-        x, y,
-        offsetX: this.framePhotoTransform.offsetX,
-        offsetY: this.framePhotoTransform.offsetY
-      };
+      this._activePointers.set(e.pointerId, { x, y });
       this.canvas.setPointerCapture(e.pointerId);
+      if (this._activePointers.size >= 2) {
+        this._isPanningPhoto = false;
+        const pts = [...this._activePointers.values()].slice(0, 2);
+        const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        this._pinchStart = { dist, scale: this.framePhotoTransform.scale };
+      } else {
+        this._isPanningPhoto = true;
+        this._panStart = {
+          x, y,
+          offsetX: this.framePhotoTransform.offsetX,
+          offsetY: this.framePhotoTransform.offsetY
+        };
+      }
       return;
     }
 
-    // スタンプ / テキストのドラッグ判定（追加した上のレイヤーから優先）
+    // 選択中の配置物：リサイズ・回転ハンドルの操作判定
+    if (this.selectedObject) {
+      const handleHit = this._hitTestHandle(this.selectedObject, x, y);
+      if (handleHit) {
+        const { kind, obj } = this.selectedObject;
+        this._handleMode = handleHit.mode;
+        if (handleHit.mode === 'resize') {
+          const dist = Math.hypot(x - handleHit.bounds.cx, y - handleHit.bounds.cy);
+          this._handleStart = {
+            dist,
+            size: kind === 'stamp' ? obj.size : obj.size,
+            cx: handleHit.bounds.cx,
+            cy: handleHit.bounds.cy
+          };
+        } else {
+          const angle = Math.atan2(y - handleHit.bounds.cy, x - handleHit.bounds.cx);
+          this._handleStart = {
+            angle,
+            rotation: obj.rotation || 0,
+            cx: handleHit.bounds.cx,
+            cy: handleHit.bounds.cy
+          };
+        }
+        this.canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+    }
+
+    // スタンプ / テキストのドラッグ・選択判定（追加した上のレイヤーから優先）
     const text = this._hitTestText(x, y);
     if (text) {
+      this.selectedObject = { kind: 'text', obj: text };
       this._dragTarget = { kind: 'text', obj: text };
       this._dragOffset = { x: x - text.x, y: y - text.y };
       this.canvas.setPointerCapture(e.pointerId);
+      this.render();
       return;
     }
     const stamp = this._hitTestStamp(x, y);
     if (stamp) {
+      this.selectedObject = { kind: 'stamp', obj: stamp };
       this._dragTarget = { kind: 'stamp', obj: stamp };
       this._dragOffset = { x: x - stamp.x, y: y - stamp.y };
       this.canvas.setPointerCapture(e.pointerId);
+      this.render();
+      return;
+    }
+
+    // 何もないところをタップしたら選択解除
+    if (this.selectedObject) {
+      this.selectedObject = null;
+      this.render();
     }
   }
 
@@ -336,9 +550,43 @@ class CanvasEditor {
       return;
     }
 
-    if (this._isPanningPhoto) {
-      this.framePhotoTransform.offsetX = this._panStart.offsetX + (x - this._panStart.x);
-      this.framePhotoTransform.offsetY = this._panStart.offsetY + (y - this._panStart.y);
+    if (this.frameAdjustMode && this._activePointers.has(e.pointerId)) {
+      this._activePointers.set(e.pointerId, { x, y });
+      if (this._pinchStart && this._activePointers.size >= 2) {
+        const pts = [...this._activePointers.values()].slice(0, 2);
+        const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        const ratio = dist / this._pinchStart.dist;
+        const newScale = Math.min(2.5, Math.max(0.5, this._pinchStart.scale * ratio));
+        this.setFramePhotoScale(newScale);
+        return;
+      }
+      if (this._isPanningPhoto) {
+        this.framePhotoTransform.offsetX = this._panStart.offsetX + (x - this._panStart.x);
+        this.framePhotoTransform.offsetY = this._panStart.offsetY + (y - this._panStart.y);
+        this.render();
+      }
+      return;
+    }
+
+    if (this._handleMode && this.selectedObject) {
+      const { kind, obj } = this.selectedObject;
+      if (this._handleMode === 'resize') {
+        const dist = Math.hypot(x - this._handleStart.cx, y - this._handleStart.cy);
+        const ratio = dist / Math.max(1, this._handleStart.dist);
+        const newSize = Math.min(800, Math.max(20, Math.round(this._handleStart.size * ratio)));
+        if (kind === 'stamp') {
+          const cx = obj.x + obj.size / 2;
+          const cy = obj.y + obj.size / 2;
+          obj.size = newSize;
+          obj.x = cx - newSize / 2;
+          obj.y = cy - newSize / 2;
+        } else {
+          obj.size = newSize;
+        }
+      } else {
+        const angle = Math.atan2(y - this._handleStart.cy, x - this._handleStart.cx);
+        obj.rotation = this._handleStart.rotation + (angle - this._handleStart.angle);
+      }
       this.render();
       return;
     }
@@ -351,13 +599,19 @@ class CanvasEditor {
     }
   }
 
-  _onPointerUp() {
+  _onPointerUp(e) {
     this._isDrawing = false;
     this._strokeSnapshot = null;
     this._strokePoints = null;
     this._isPanningPhoto = false;
     this._panStart = null;
+    this._pinchStart = null;
+    if (e && this._activePointers.has(e.pointerId)) {
+      this._activePointers.delete(e.pointerId);
+    }
     this._dragTarget = null;
+    this._handleMode = null;
+    this._handleStart = null;
   }
 
   _onDoubleClick(e) {
@@ -367,12 +621,14 @@ class CanvasEditor {
     const text = this._hitTestText(x, y);
     if (text) {
       this.texts = this.texts.filter(t => t !== text);
+      if (this.selectedObject && this.selectedObject.obj === text) this.selectedObject = null;
       this.render();
       return;
     }
     const stamp = this._hitTestStamp(x, y);
     if (stamp) {
       this.stamps = this.stamps.filter(s => s !== stamp);
+      if (this.selectedObject && this.selectedObject.obj === stamp) this.selectedObject = null;
       this.render();
     }
   }
@@ -383,6 +639,8 @@ class CanvasEditor {
     if (!width || !height) return;
     this.undoStack.push(this.drawCtx.getImageData(0, 0, width, height));
     if (this.undoStack.length > 20) this.undoStack.shift();
+    this.redoStack = [];
+    this._notifyUndoStackChange();
   }
 
   // ストローク中のプレビューを描き直す。

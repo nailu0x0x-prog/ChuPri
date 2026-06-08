@@ -313,8 +313,13 @@ frameAdjustBtn.addEventListener('click', () => {
 });
 
 framePhotoScale.addEventListener('input', (e) => {
-  editor.setFramePhotoScale(Number(e.target.value));
+  editor.setFramePhotoScale(Number(e.target.value), { silent: true });
 });
+
+// ピンチ操作でスケールが変わったらスライダー側の表示も合わせる
+editor.onFrameScaleChange = (scale) => {
+  framePhotoScale.value = scale;
+};
 
 // --- 落書き ---
 $('#pen-color').addEventListener('input', (e) => editor.setPenColor(e.target.value));
@@ -343,8 +348,20 @@ penStyleButtons.forEach(btn => {
   });
 });
 
-$('#btn-undo').addEventListener('click', () => editor.undo());
-$('#btn-clear-draw').addEventListener('click', () => editor.clearDrawing());
+const btnUndo = $('#btn-undo');
+const btnRedo = $('#btn-redo');
+const btnClearDraw = $('#btn-clear-draw');
+btnUndo.addEventListener('click', () => editor.undo());
+btnRedo.addEventListener('click', () => editor.redo());
+btnClearDraw.addEventListener('click', () => editor.clearDrawing());
+
+// 戻す/やり直す/全て戻るボタンの有効・無効をスタックの状態に合わせて切り替える
+editor.onUndoStackChange = (undoCount, redoCount) => {
+  btnUndo.disabled = undoCount === 0;
+  btnRedo.disabled = redoCount === 0;
+  btnClearDraw.disabled = undoCount === 0;
+};
+editor.onUndoStackChange(editor.undoStack.length, editor.redoStack.length);
 
 // 消しゴムサイズのドット選択
 const eraserDots = document.querySelectorAll('.eraser-dot');

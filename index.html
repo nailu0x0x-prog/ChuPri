@@ -57,7 +57,7 @@
           <label class="row" style="margin:0 0 6px">写真の大きさ
             <input type="range" id="frame-photo-scale" min="0.5" max="2.5" step="0.01" value="1">
           </label>
-          <p class="hint">キャンバスをドラッグすると写真の位置を調整できます。終わったらもう一度ボタンを押してね。</p>
+          <p class="hint">キャンバスをドラッグすると写真の位置を、2本指でつまむように動かす（ピンチ）と大きさを調整できます。終わったらもう一度ボタンを押してね。</p>
         </div>
 
         <div class="canvas-wrap">
@@ -68,6 +68,7 @@
         <!-- キャンバス直下のクイック操作（戻す・消しゴムサイズ）-->
         <div class="quick-controls">
           <button id="btn-undo" class="tri-btn">1つ戻る</button>
+          <button id="btn-redo" class="tri-btn">やり直す</button>
           <button id="btn-clear-draw" class="tri-btn">全て戻る</button>
           <div class="eraser-box">
             <span class="eraser-label">消しゴム</span>
@@ -116,7 +117,7 @@
 
           <div class="tool-panel" data-panel="stamp">
             <div id="stamp-list" class="thumb-list"></div>
-            <p class="hint">タップで配置 / ドラッグで移動 / ダブルタップで削除</p>
+            <p class="hint">タップで配置 / ドラッグで移動 / ダブルタップで削除<br>選択中は ↔️ で拡大縮小、🔄 で回転できるよ</p>
           </div>
 
           <div class="tool-panel" data-panel="text">
@@ -139,7 +140,7 @@
               <label>縁取り色 <input type="color" id="text-stroke" value="#ff3399"></label>
               <label><input type="checkbox" id="text-shadow" checked> 影をつける</label>
             </div>
-            <p class="hint">追加後はドラッグで移動 / ダブルタップで削除</p>
+            <p class="hint">追加後はドラッグで移動 / ダブルタップで削除<br>選択中は ↔️ で拡大縮小、🔄 で回転できるよ</p>
           </div>
 
           <div class="tool-panel" data-panel="filter">
