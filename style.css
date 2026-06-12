@@ -17,11 +17,44 @@ html, body {
 }
 
 body {
-  font-family: 'Hiragino Maru Gothic ProN', 'Yu Gothic', sans-serif;
+  font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Yu Gothic', sans-serif;
   background: linear-gradient(160deg, #ffd9ea 0%, #ffeef6 45%, #fff8fb 100%);
   color: var(--text);
   min-height: 100vh;
   touch-action: manipulation; /* ダブルタップでのページ拡大を防止 */
+  position: relative;
+}
+
+/* 背景にふわふわ浮かぶ装飾モチーフ */
+.bg-decor {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.bg-decor-item {
+  position: absolute;
+  font-size: 28px;
+  opacity: 0.22;
+  animation: bg-float 16s ease-in-out infinite;
+  filter: drop-shadow(0 2px 6px rgba(255, 120, 180, 0.25));
+}
+.bg-decor-item:nth-child(1) { left: 8%;  top: 10%;  font-size: 30px; animation-duration: 18s; animation-delay: 0s; }
+.bg-decor-item:nth-child(2) { left: 80%; top: 18%;  font-size: 22px; animation-duration: 14s; animation-delay: 2s; }
+.bg-decor-item:nth-child(3) { left: 18%; top: 60%;  font-size: 26px; animation-duration: 20s; animation-delay: 4s; }
+.bg-decor-item:nth-child(4) { left: 70%; top: 70%;  font-size: 20px; animation-duration: 13s; animation-delay: 1s; }
+.bg-decor-item:nth-child(5) { left: 45%; top: 5%;   font-size: 24px; animation-duration: 17s; animation-delay: 3s; }
+.bg-decor-item:nth-child(6) { left: 88%; top: 50%;  font-size: 22px; animation-duration: 15s; animation-delay: 5s; }
+
+@keyframes bg-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-22px) rotate(12deg); }
+}
+
+#app {
+  position: relative;
+  z-index: 1;
 }
 
 #app {
@@ -65,7 +98,8 @@ body {
   text-decoration: none;
   box-shadow: 0 3px 10px rgba(255, 150, 190, 0.25);
 }
-.btn:active { transform: scale(0.96); }
+.btn { transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, box-shadow 0.2s ease; }
+.btn:active { transform: scale(0.94); }
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
   color: #fff;
@@ -100,6 +134,12 @@ body {
 .logo::after {
   content: ' ♡';
   -webkit-text-fill-color: var(--accent-pink);
+  display: inline-block;
+  animation: logo-heartbeat 1.6s ease-in-out infinite;
+}
+@keyframes logo-heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
 }
 /* フレーム選択カルーセル */
 .frame-carousel {
@@ -296,7 +336,10 @@ body {
   box-shadow: 0 3px 10px rgba(255, 150, 190, 0.28);
   transition: transform 0.1s ease;
 }
-.circle-btn:active { transform: scale(0.93); }
+.circle-btn {
+  transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.circle-btn:active { transform: scale(0.9); }
 
 .canvas-wrap {
   position: relative;
@@ -309,7 +352,7 @@ body {
   border-radius: 16px;
   padding: 8px;
   overflow: hidden;
-  min-height: 50vh;
+  min-height: 200px;
   box-shadow: 0 6px 24px rgba(255, 150, 190, 0.2);
 }
 #main-canvas {
@@ -341,7 +384,8 @@ body {
   cursor: pointer;
   transition: transform 0.1s ease;
 }
-.tri-btn:active { transform: scale(0.95); }
+.tri-btn { transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.tri-btn:active { transform: scale(0.93); }
 .tri-btn:disabled {
   opacity: 0.4;
   cursor: default;
@@ -390,7 +434,7 @@ body {
   height: var(--dot, 10px);
   border-radius: 50%;
   background: var(--text-soft);
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .eraser-dot.active::before {
   background: var(--accent-pink);
@@ -411,10 +455,15 @@ body {
   font-weight: bold;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(255, 79, 154, 0.35);
-  transition: transform 0.1s ease;
+  transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 3;
+  animation: save-badge-pulse 2.4s ease-in-out infinite;
 }
-.btn-save-badge:active { transform: scale(0.93); }
+.btn-save-badge:active { transform: scale(0.9); }
+@keyframes save-badge-pulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(255, 79, 154, 0.35); }
+  50% { box-shadow: 0 4px 20px rgba(255, 79, 154, 0.6); }
+}
 
 .draw-options {
   display: flex;
@@ -495,23 +544,37 @@ body {
 }
 .tab-btn {
   flex: 1;
-  padding: 12px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 6px;
   border: none;
   border-right: 2px solid var(--accent-purple);
   background: var(--white);
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease;
+}
+.tab-icon {
+  font-size: 18px;
+  line-height: 1;
 }
 .tab-btn:last-child {
   border-right: none;
+}
+.tab-btn:active {
+  transform: scale(0.95);
 }
 .tab-btn.active {
   background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
   color: #fff;
   font-weight: bold;
+  transform: scale(1.04);
 }
 
 .tool-panels {
