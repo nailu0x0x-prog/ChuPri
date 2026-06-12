@@ -549,7 +549,7 @@ class CanvasEditor {
       return;
     }
 
-    if (this.activeTab === 'draw') {
+    if (this.activeTab === 'draw' && !this.frameAdjustMode) {
       this._isDrawing = true;
       this._pushUndo();
       this._strokeSnapshot = this.drawCtx.getImageData(0, 0, this.drawLayer.width, this.drawLayer.height);
@@ -562,6 +562,7 @@ class CanvasEditor {
     }
 
     // 位置調整モード：ドラッグで窓枠内の写真位置を調整（2本指でピンチするとズーム）
+    // ペンなどの操作タブが選んであっても、位置調整中は写真の移動・拡大縮小のみを行う
     if (this.frameAdjustMode && this.frame) {
       this._activePointers.set(e.pointerId, { x, y });
       this.canvas.setPointerCapture(e.pointerId);
