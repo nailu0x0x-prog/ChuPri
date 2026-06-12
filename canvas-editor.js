@@ -778,16 +778,32 @@ class CanvasEditor {
   }
 
   _tracePath(ctx, points, dx = 0, dy = 0) {
+    CanvasEditor._tracePathSmooth(ctx, points, dx, dy);
+  }
+
+  // 点列を2次ベジェで補間し、角張らずなめらかな曲線として描画パスを組み立てる
+  static _tracePathSmooth(ctx, points, dx = 0, dy = 0) {
     ctx.beginPath();
     if (points.length === 1) {
       ctx.moveTo(points[0].x + dx, points[0].y + dy);
       ctx.lineTo(points[0].x + dx, points[0].y + dy);
-    } else {
-      ctx.moveTo(points[0].x + dx, points[0].y + dy);
-      for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x + dx, points[i].y + dy);
-      }
+      return;
     }
+    if (points.length === 2) {
+      ctx.moveTo(points[0].x + dx, points[0].y + dy);
+      ctx.lineTo(points[1].x + dx, points[1].y + dy);
+      return;
+    }
+    ctx.moveTo(points[0].x + dx, points[0].y + dy);
+    for (let i = 1; i < points.length - 1; i++) {
+      const cur = points[i];
+      const next = points[i + 1];
+      const midX = (cur.x + next.x) / 2 + dx;
+      const midY = (cur.y + next.y) / 2 + dy;
+      ctx.quadraticCurveTo(cur.x + dx, cur.y + dy, midX, midY);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last.x + dx, last.y + dy);
   }
 
   _paintEraserPath(points) {
@@ -814,14 +830,7 @@ class CanvasEditor {
     ctx.lineJoin = 'round';
 
     const tracePath = (dx = 0, dy = 0) => {
-      ctx.beginPath();
-      if (points.length === 1) {
-        ctx.moveTo(points[0].x + dx, points[0].y + dy);
-        ctx.lineTo(points[0].x + dx, points[0].y + dy);
-      } else {
-        ctx.moveTo(points[0].x + dx, points[0].y + dy);
-        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x + dx, points[i].y + dy);
-      }
+      CanvasEditor._tracePathSmooth(ctx, points, dx, dy);
     };
 
     const strokePath = (lineWidth, strokeStyle, alpha = 1, dx = 0, dy = 0) => {
@@ -836,7 +845,7 @@ class CanvasEditor {
       case 'outline':
         // ハロー（白縁）は背景、コア（色線）は前景として分離し、
         // 別ストロークと交差しても白縁が相手の線を覆わないようにする
-        if (wantsHalo) strokePath(w + Math.max(2, w * 0.5), '#ffffff', 1);
+        if (wantsHalo) strokePath(w + Math.max(2, w * 0.35), '#ffffff', 1);
         if (wantsCore) strokePath(w, color, 1);
         break;
 
