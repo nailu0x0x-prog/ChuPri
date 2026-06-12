@@ -859,12 +859,12 @@ class CanvasEditor {
         break;
       }
 
-      // 白いハイライト部分は背景、色の線はコア（前景）として分離し、
+      // 太い色の本体は背景、白いハイライトはコア（前景）として分離し、
       // 別ストロークと交差しても自然に繋がって見えるようにする
       case 'puffy': {
         const offset = w * 0.18;
-        if (wantsHalo) strokePath(Math.max(1, w * 0.4), 'rgba(255,255,255,0.65)', 1, -offset, -offset);
-        if (wantsCore) strokePath(w, color, 1);
+        if (wantsHalo) strokePath(w, color, 1);
+        if (wantsCore) strokePath(Math.max(1, w * 0.4), 'rgba(255,255,255,0.65)', 1, -offset, -offset);
         break;
       }
 
@@ -890,18 +890,18 @@ class CanvasEditor {
         ctx.globalCompositeOperation = 'source-over';
         break;
 
-      // 白いハイライト部分は背景、発光する色の線はコア（前景）として分離する
+      // 発光する色の線は背景、白いハイライトはコア（前景）として分離する
       case 'neon':
         if (wantsHalo) {
           ctx.shadowColor = color;
-          ctx.shadowBlur = w * 0.8;
-          strokePath(Math.max(1, w * 0.4), '#ffffff', 0.95);
+          ctx.shadowBlur = w * 1.6;
+          strokePath(w, color, 1);
           ctx.shadowBlur = 0;
         }
         if (wantsCore) {
           ctx.shadowColor = color;
-          ctx.shadowBlur = w * 1.6;
-          strokePath(w, color, 1);
+          ctx.shadowBlur = w * 0.8;
+          strokePath(Math.max(1, w * 0.4), '#ffffff', 0.95);
           ctx.shadowBlur = 0;
         }
         break;
