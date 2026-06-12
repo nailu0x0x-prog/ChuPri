@@ -87,9 +87,18 @@
 
         <!-- キャンバス直下のクイック操作（戻す・消しゴムサイズ）-->
         <div class="quick-controls">
-          <button id="btn-undo" class="tri-btn">↩️ 1つ戻る</button>
-          <button id="btn-redo" class="tri-btn">↪️ やり直す</button>
-          <button id="btn-clear-draw" class="tri-btn">🗑️ 全て戻る</button>
+          <button id="btn-undo" class="tri-btn">
+            <svg class="tri-icon" viewBox="0 0 16 16" aria-hidden="true"><polygon points="12,2 12,14 3,8" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
+            1つ戻る
+          </button>
+          <button id="btn-redo" class="tri-btn">
+            <svg class="tri-icon" viewBox="0 0 16 16" aria-hidden="true"><polygon points="4,2 4,14 13,8" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
+            やり直す
+          </button>
+          <button id="btn-clear-draw" class="tri-btn">
+            <svg class="tri-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="3.5" fill="currentColor"/></svg>
+            全て戻る
+          </button>
           <div class="eraser-box">
             <span class="eraser-label">消しゴム</span>
             <div class="eraser-dots">

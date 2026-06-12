@@ -392,6 +392,10 @@ body {
 .tri-btn {
   flex: none;
   min-width: 84px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 14px 10px;
   border: 2px solid var(--accent-purple);
   border-radius: 14px;
@@ -401,6 +405,15 @@ body {
   font-weight: bold;
   cursor: pointer;
   transition: transform 0.1s ease;
+}
+.tri-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--accent-pink);
+}
+.tri-btn:disabled .tri-icon {
+  color: var(--text-soft);
 }
 .tri-btn { transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .tri-btn:active { transform: scale(0.93); }
