@@ -1,11 +1,15 @@
 @font-face {
   font-family: 'Yuruka';
   src: url('assets/fonts/FOT-YurukaStd-UB.otf') format('opentype');
-  font-weight: normal;
+  font-weight: 100 900;
   font-display: swap;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+button, input, select, textarea {
+  font-family: inherit;
+}
 
 :root {
   --bg-light: #ffeef6;
