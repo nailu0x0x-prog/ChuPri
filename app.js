@@ -252,28 +252,14 @@ $('#btn-shoot').addEventListener('click', () => {
 // タブ切り替え
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabPanels = document.querySelectorAll('.tool-panel');
-const editSidebar = document.querySelector('.edit-sidebar');
 
 tabButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
-    const wasActive = btn.classList.contains('active');
     tabButtons.forEach(b => b.classList.toggle('active', b === btn));
     tabPanels.forEach(p => p.classList.toggle('active', p.dataset.panel === tab));
     editor.setActiveTab(tab);
-
-    // スマホ表示：タブをタップするとパネルが迫り上がる（同じタブの再タップでたたむ）
-    if (wasActive && editSidebar.classList.contains('expanded')) {
-      editSidebar.classList.remove('expanded');
-    } else {
-      editSidebar.classList.add('expanded');
-    }
   });
-});
-
-// 画面（キャンバス）をタップするとパネルをたたんで写真を見やすくする
-$('.canvas-wrap').addEventListener('pointerdown', () => {
-  editSidebar.classList.remove('expanded');
 });
 
 // --- スタンプ ---

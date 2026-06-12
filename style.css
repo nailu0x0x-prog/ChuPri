@@ -524,15 +524,10 @@ body {
   min-height: 0;
 }
 
-/* スマホ表示：パネルは普段たたんでおき、タブをタップすると下から迫り上がる */
+/* スマホ表示：操作パネルはタブの下に常時表示 */
 @media (max-width: 899px) {
   .tool-panels {
     flex: none;
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease;
-  }
-  .edit-sidebar.expanded .tool-panels {
     max-height: 56vh;
     overflow-y: auto;
   }
